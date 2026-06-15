@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Лабиринт Инерции: Классика и Бонусы</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            margin: 0;
+            padding: 15px;
+            user-select: none;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+
+        #main-container {
+            display: flex;
+            gap: 15px;
+            width: 100%;
+            max-width: 1500px;
+            height: calc(100vh - 30px);
+        }
+
+        #left-sidebar {
+            flex: 0 0 350px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            height: 100%;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        #game-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        h1 { 
+            font-size: 1.4rem; 
+            margin: 0 0 5px 0; 
+            text-align: center;
+            color: #2ecc71;
+        }
+        
+        .panel {
+            background: #34495e;
+            padding: 12px 18px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+
+        .slider-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin-bottom: 10px;
+            font-weight: bold;
+            font-size: 0.85rem;
+        }
+        .slider-group label { color: #bdc3c7; }
+        .slider-group input { width: 100%; cursor: pointer; }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 12px 0;
+            font-weight: bold;
+            font-size: 0.9rem;
+            cursor: pointer;
+            color: #eaf0f1;
+        }
+        .checkbox-group input {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: #2ecc71;
+        }
+
+        #status-panel {
+            font-size: 1.05rem;
+            font-weight: bold;
+            text-align: center;
+            border-radius: 6px;
+            padding: 10px;
+            background: #1a252f;
+            transition: all 0.3s;
+        }
+        .p1-turn { border: 2px solid #ff4757; color: #ff4757; }
+        .p2-turn { border: 2px solid #1e90ff; color: #1e90ff; }
+        .game-over-status { border: 2px solid #f1c40f; color: #f1c40f; }
+        
+        #game-viewport {
+            width: 100%;
+            height: 100%;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border-radius: 8px;
+            background: #1b9247;
+            overflow: hidden; 
+        }
+        canvas { display: block; cursor: crosshair; width: 100%; height: 100%; }
+        
+        button {
+            background-color: #2ecc71;
+            color: white;
+            border: none;
+            width: 100%;
+            padding: 10px;
+            font-size: 0.95rem;
+            cursor: pointer;
+            border-radius: 5px;
+            font-weight: bold;
+            box-shadow: 0 4px 10px rgba(46, 204, 113, 0.2);
+            transition: background 0.2s;
+        }
+        button:hover { background-color: #27ae60; }
+        
+        #rules { font-size: 0.85rem; line-height: 1.4; }
+        #rules h3 { margin-top: 15px; margin-bottom: 8px; font-size: 0.95rem; color: #e67e22;}
+        #rules h3:first-child { margin-top: 0; }
+        #rules ul { padding-left: 0; margin: 0; list-style: none; }
+
+        .bonus-legend { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 8px; 
+            margin: 8px 0; 
+        }
+        .bonus-row { 
+            display: grid; 
+            grid-template-columns: 24px 1fr; 
+            align-items: center; 
+            gap: 8px; 
+            font-size: 0.85rem; 
+            line-height: 1.2;
+        }
+        .badge { 
+            width: 18px; 
+            height: 18px; 
+            border-radius: 4px; 
+            display: inline-block; 
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .player-card {
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            font-size: 0.85rem;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.2);
+        }
+        .p1-card { 
+            background: rgba(255, 71, 87, 0.15); 
+            border-left: 4px solid #ff4757;
+        }
+        .p1-card b { color: #ff4757; }
+        
+        .p2-card { 
+            background: rgba(30, 144, 255, 0.15); 
+            border-left: 4px solid #1e90ff;
+        }
+        .p2-card b { color: #1e90ff; }
+    </style>
+</head>
+<body>
+
+    <div id="main-container">
+        <div id="left-sidebar">
+            <div class="panel">
+                <h1>Лабиринт Инерции</h1>
+                <div id="status-panel" class="p1-turn">Ход Игрока 1</div>
+            </div>
+
+            <div class="panel">
+                <div class="slider-group">
+                    <label for="widthSlider">Ширина поля: <span id="widthVal">140</span></label>
+                    <input type="range" id="widthSlider" min="60" max="1000" value="140" step="20">
+                </div>
+                <div class="slider-group">
+                    <label for="heightSlider">Высота поля: <span id="heightVal">60</span></label>
+                    <input type="range" id="heightSlider" min="40" max="1000" value="60" step="20">
+                </div>
+                
+                <label class="checkbox-group">
+                    <input type="checkbox" id="bonusCheckbox" checked onchange="toggleBonusLegend()">
+                    <span>Включить суперсилы</span>
+                </label>
+
+                <button onclick="resetGame()">Сгенерировать трассу</button>
+            </div>
+
+            <div id="rules" class="panel">
+                <div id="bonus-rules-section">
+                    <h3>🌀 СУПЕРСИЛЫ НА КАРТЕ:</h3>
+                    <div class="bonus-legend">
+                        <div class="bonus-row">
+                            <span class="badge" style="background: #ff6b81;"></span>
+                            <div><b>❤️ ДОП. ЖИЗНЬ:</b> Спасает при аварии, гасит скорость.</div>
+                        </div>
+                        <div class="bonus-row">
+                            <span class="badge" style="background: #9b59b6;"></span>
+                            <div><b>🟣 ЯКОРЬ-ЛОВУШКА:</b> Стопорит следующий ход врага.</div>
+                        </div>
+                        <div class="bonus-row">
+                            <span class="badge" style="background: #e67e22;"></span>
+                            <div><b>🟠 ТЕЛЕПОРТ:</b> Прыжок в любую точку дороги.</div>
+                        </div>
+                        <div class="bonus-row">
+                            <span class="badge" style="background: #f1c40f;"></span>
+                            <div><b>🟡 Турбо 5х5:</b> Расширяет маневрирование.</div>
+                        </div>
+                        <div class="bonus-row">
+                            <span class="badge" style="background: #2980b9;"></span>
+                            <div><b>🔵 Призрак:</b> Проход сквозь стены (4 заряда). Из стен можно выйти без потерь.</div>
+                        </div>
+                        <div class="bonus-row">
+                            <span class="badge" style="background: #27ae60;"></span>
+                            <div><b>🟢 Нитро:</b> Дает импульс +2 вперед.</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <h3>⌨️ УПРАВЛЕНИЕ:</h3>
+                <ul>
+                    <li class="player-card p1-card"><b>Игрок 1:</b> QWE / ASD / ZXC (S - стоп)</li>
+                    <li class="player-card p2-card"><b>Игрок 2:</b> 789 / 456 / 123 (5 - стоп)</li>
+                </ul>
+            </div>
+        </div>
+
+        <div id="game-container">
+            <div id="game-viewport">
+                <canvas id="gameCanvas"></canvas>
+            </div>
+        </div>
+    </div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const statusPanel = document.getElementById('status-panel');
+
+const widthSlider = document.getElementById('widthSlider');
+const heightSlider = document.getElementById('heightSlider');
+const widthVal = document.getElementById('widthVal');
+const heightVal = document.getElementById('heightVal');
+const bonusCheckbox = document.getElementById('bonusCheckbox');
+const bonusRulesSection = document.getElementById('bonus-rules-section');
+
+const CELL_SIZE = 25; 
+let COLS = parseInt(widthSlider.value); 
+let ROWS = parseInt(heightSlider.value); 
+let MAP_WIDTH = COLS * CELL_SIZE;  
+let MAP_HEIGHT = ROWS * CELL_SIZE; 
+
+let trackMask = []; 
+let bonusMap = {}; 
+let players = [];
+let currentPlayer = 0;
+let gameOver = false;
+
+let startXCoord = 0;
+let startYCoord = 0; 
+let finishPoints = []; 
+
+let cameraX = 0;
+let cameraY = 0;
+
+const P1_KEYS = {
+    'q': {dx: -1, dy: -1}, 'й': {dx: -1, dy: -1}, 'w': {dx: 0, dy: -1}, 'ц': {dx: 0, dy: -1}, 'e': {dx: 1, dy: -1}, 'у': {dx: 1, dy: -1},
+    'a': {dx: -1, dy: 0}, 'ф': {dx: -1, dy: 0},  's': {dx: 0, dy: 0},  'ы': {dx: 0, dy: 0},  'd': {dx: 1, dy: 0},  'в': {dx: 1, dy: 0},
+    'z': {dx: -1, dy: 1}, 'я': {dx: -1, dy: 1},  'x': {dx: 0, dy: 1},  'ч': {dx: 0, dy: 1},  'c': {dx: 1, dy: 1},  'с': {dx: 1, dy: 1}
+};
+
+const P2_KEYS = {
+    '7': {dx: -1, dy: -1}, 'Numpad7': {dx: -1, dy: -1}, '8': {dx: 0, dy: -1}, 'Numpad8': {dx: 0, dy: -1}, '9': {dx: 1, dy: -1}, 'Numpad9': {dx: 1, dy: -1},
+    '4': {dx: -1, dy: 0},  'Numpad4': {dx: -1, dy: 0},  '5': {dx: 0, dy: 0},  'Numpad5': {dx: 0, dy: 0},  '6': {dx: 1, dy: 0},  'Numpad6': {dx: 1, dy: 0},
+    '1': {dx: -1, dy: 1},  'Numpad1': {dx: -1, dy: 1},  '2': {dx: 0, dy: 1},  'Numpad2': {dx: 0, dy: 1},  '3': {dx: 1, dy: 1},  'Numpad3': {dx: 1, dy: 1}
+};
+
+function toggleBonusLegend() {
+    if (bonusCheckbox.checked) {
+        bonusRulesSection.style.display = 'block';
+    } else {
+        bonusRulesSection.style.display = 'none';
+    }
+}
+
+function resizeCanvas() {
+    const rect = canvas.parentElement.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+    updateCamera();
+    draw();
+}
+window.addEventListener('resize', resizeCanvas);
+
+widthSlider.addEventListener('input', () => { widthVal.textContent = widthSlider.value; });
+heightSlider.addEventListener('input', () => { heightVal.textContent = heightSlider.value; });
+
+function initPlayers(startX, startY) {
+    players = [
+        {
+            id: 1, name: "Игрок 1 (Красный)", color: "#ff4757",
+            x: startX, y: startY, vx: 0, vy: 0,
+            history: [{x: startX, y: startY}], alive: true,
+            turboTurns: 0, ghostWalls: 0, hasTeleport: false,
+            lives: 1, forceAnchor: false
+        },
+        {
+            id: 2, name: "Игрок 2 (Синий)", color: "#1e90ff",
+            x: startX, y: startY, vx: 0, vy: 0,
+            history: [{x: startX, y: startY}], alive: true,
+            turboTurns: 0, ghostWalls: 0, hasTeleport: false,
+            lives: 1, forceAnchor: false
+        }
+    ];
+    currentPlayer = 0;
+    gameOver = false;
+    updateStatus();
+    setTimeout(resizeCanvas, 50); 
+}
+
+function updateCamera() {
+    if (gameOver || players.length === 0) return;
+    const p = players[currentPlayer];
+    
+    cameraX = (p.x * CELL_SIZE + CELL_SIZE / 2) - canvas.width / 2;
+    cameraY = (p.y * CELL_SIZE + CELL_SIZE / 2) - canvas.height / 2;
+
+    if (cameraX < 0) cameraX = 0;
+    if (cameraX > MAP_WIDTH - canvas.width) cameraX = MAP_WIDTH - canvas.width;
+    if (cameraY < 0) cameraY = 0;
+    if (cameraY > MAP_HEIGHT - canvas.height) cameraY = MAP_HEIGHT - canvas.height;
+    
+    if (MAP_WIDTH < canvas.width) cameraX = (MAP_WIDTH - canvas.width) / 2;
+    if (MAP_HEIGHT < canvas.height) cameraY = (MAP_HEIGHT - canvas.height) / 2;
+}
+
+function isCellFinish(x, y) {
+    return finishPoints.some(p => p.x === x && p.y === y);
+}
+
+function checkPathAndFinish(x0, y0, x1, y1, hasGhostEffect) {
+    if (x1 < 0 || x1 >= COLS || y1 < 0 || y1 >= ROWS) {
+        return { status: "CRASH" };
+    }
+
+    let currentInWall = (x0 >= 0 && x0 < COLS && y0 >= 0 && y0 < ROWS) ? !trackMask[x0][y0] : false;
+    let targetOnRoad = trackMask[x1][y1];
+
+    if (currentInWall && targetOnRoad) {
+        return { status: "CLEAR" }; 
+    }
+
+    let dx = Math.abs(x1 - x0);
+    let dy = Math.abs(y1 - y0);
+    let sx = (x0 < x1) ? 1 : -1;
+    let sy = (y0 < y1) ? 1 : -1;
+    let err = dx - dy;
+
+    let currentX = x0;
+    let currentY = y0;
+
+    while (true) {
+        if (isCellFinish(currentX, currentY)) {
+            return { status: "FINISH", x: currentX, y: currentY };
+        }
+
+        if (currentX < 0 || currentX >= COLS || currentY < 0 || currentY >= ROWS) {
+            return { status: "CRASH" };
+        }
+
+        if (!trackMask[currentX][currentY] && !hasGhostEffect) {
+            return { status: "CRASH" };
+        }
+
+        if (currentX === x1 && currentY === y1) break;
+        let e2 = 2 * err;
+        if (e2 > -dy) { err -= dy; currentX += sx; }
+        if (e2 < dx) { err += dx; currentY += sy; }
+    }
+
+    return { status: "CLEAR" };
+}
+
+function getValidMovesCount(playerIdx) {
+    let p = players[playerIdx];
+    if (p.hasTeleport || p.forceAnchor) return 1; 
+    
+    let nextCenterX = p.x + p.vx;
+    let nextCenterY = p.y + p.vy;
+    let opponent = players[(playerIdx + 1) % 2];
+    let validMoves = 0;
+
+    let radius = p.turboTurns > 0 ? 2 : 1;
+
+    for(let dx = -radius; dx <= radius; dx++) {
+        for(let dy = -radius; dy <= radius; dy++) {
+            let tx = nextCenterX + dx; let ty = nextCenterY + dy;
+            let isOccupied = (opponent.alive && opponent.x === tx && opponent.y === ty);
+            let pathRes = checkPathAndFinish(p.x, p.y, tx, ty, p.ghostWalls > 0);
+            
+            if (!isOccupied && (pathRes.status === "CLEAR" || pathRes.status === "FINISH")) {
+                validMoves++;
+            }
+        }
+    }
+    return validMoves;
+}
+
+function generateMazeTrack() {
+    COLS = parseInt(widthSlider.value);
+    ROWS = parseInt(heightSlider.value);
+    MAP_WIDTH = COLS * CELL_SIZE;
+    MAP_HEIGHT = ROWS * CELL_SIZE;
+
+    trackMask = Array(COLS);
+    for (let i = 0; i < COLS; i++) {
+        trackMask[i] = new Array(ROWS).fill(false);
+    }
+    
+    bonusMap = {};
+    finishPoints = [];
+
+    startXCoord = 5;
+    startYCoord = Math.floor(ROWS / 2);
+
+    let mainPoints = [];
+    mainPoints.push({ x: startXCoord, y: startYCoord });
+
+    let segments = Math.max(6, Math.floor(COLS / 20));
+    let stepX = Math.floor((COLS - 10) / segments);
+
+    let currentX = startXCoord;
+    let currentY = startYCoord;
+
+    for (let i = 1; i <= segments; i++) {
+        currentX += stepX;
+        if (i === segments) currentX = COLS - 6;
+
+        let minY = 6;
+        let maxY = ROWS - 7;
+        currentY = Math.floor(minY + Math.random() * (maxY - minY));
+
+        mainPoints.push({ x: currentX, y: currentY });
+    }
+
+    drawThickness(mainPoints, 3.5);
+
+    let mapArea = COLS * ROWS;
+    let deadEndsCount = Math.max(3, Math.floor(mapArea / 3000)); 
+    let deadEndNodes = [];
+
+    for (let k = 0; k < deadEndsCount; k++) {
+        let baseIdx = Math.floor(1 + Math.random() * (mainPoints.length - 2));
+        let basePt = mainPoints[baseIdx];
+
+        let dirY = Math.random() > 0.5 ? 1 : -1;
+        let length = Math.floor(8 + Math.random() * 15);
+        
+        let endPt = {
+            x: Math.max(5, Math.min(COLS - 6, basePt.x + Math.floor((Math.random() - 0.5) * 16))),
+            y: Math.max(5, Math.min(ROWS - 6, basePt.y + (dirY * length)))
+        };
+
+        drawThickness([basePt, endPt], 2.8);
+        deadEndNodes.push(endPt);
+    }
+
+    let bestEndPt = null;
+    if (deadEndNodes.length > 0) {
+        deadEndNodes.sort((a, b) => b.x - a.x);
+        bestEndPt = deadEndNodes[0]; 
+    } else {
+        bestEndPt = mainPoints[mainPoints.length - 1];
+    }
+
+    let fRadius = 3;
+    for(let x = bestEndPt.x - fRadius; x <= bestEndPt.x + fRadius; x++) {
+        for(let y = bestEndPt.y - fRadius; y <= bestEndPt.y + fRadius; y++) {
+            if(x >= 0 && x < COLS && y >= 0 && y < ROWS && trackMask[x][y]) {
+                if(Math.abs(x - bestEndPt.x) <= 1 && Math.abs(y - bestEndPt.y) <= 1) {
+                    finishPoints.push({ x: x, y: y });
+                }
+            }
+        }
+    }
+
+    // РАЗМЕЩЕНИЕ БОНУСОВ ТОЛЬКО ПРИ ВКЛЮЧЕННОЙ ГАЛОЧКЕ
+    if (bonusCheckbox.checked) {
+        let bonusCountPerType = Math.max(1, Math.min(40, Math.floor(mapArea / 6000)));
+        const types = ['turbo', 'ghost', 'nitro', 'anchor', 'teleport', 'life'];
+        
+        types.forEach(type => {
+            let placed = 0; let attempts = 0;
+            while(placed < bonusCountPerType && attempts < 1000) {
+                attempts++;
+                let rx = Math.floor(Math.random() * (COLS - 4)) + 2;
+                let ry = Math.floor(Math.random() * (ROWS - 4)) + 2;
+                
+                if (trackMask[rx][ry] && !bonusMap[`${rx},${ry}`] && !isCellFinish(rx, ry) && Math.abs(rx - startXCoord) > 4) {
+                    bonusMap[`${rx},${ry}`] = { type: type };
+                    placed++;
+                }
+            }
+        });
+    }
+
+    initPlayers(startXCoord, startYCoord);
+}
+
+function drawThickness(points, radius) {
+    for(let i=0; i<points.length - 1; i++) {
+        let p1 = points[i]; let p2 = points[i+1];
+        let steps = Math.max(Math.abs(p2.x - p1.x), Math.abs(p2.y - p1.y)) * 2;
+        for(let s=0; s<=steps; s++) {
+            let t = s / steps;
+            let lx = p1.x + (p2.x - p1.x) * t; let ly = p1.y + (p2.y - p1.y) * t;
+            let minX = Math.max(0, Math.floor(lx - radius));
+            let maxX = Math.min(COLS - 1, Math.ceil(lx + radius));
+            let minY = Math.max(0, Math.floor(ly - radius));
+            let maxY = Math.min(ROWS - 1, Math.ceil(ly + radius));
+            
+            for(let x = minX; x <= maxX; x++) {
+                for(let y = minY; y <= maxY; y++) {
+                    if((x - lx)**2 + (y - ly)**2 <= radius**2) trackMask[x][y] = true;
+                }
+            }
+        }
+    }
+}
+
+function draw() {
+    if (!canvas.width || !canvas.height) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.save();
+
+    if (gameOver) {
+        let scaleX = canvas.width / MAP_WIDTH; let scaleY = canvas.height / MAP_HEIGHT;
+        let finalScale = Math.min(scaleX, scaleY);
+        let offsetX = (canvas.width - MAP_WIDTH * finalScale) / 2; let offsetY = (canvas.height - MAP_HEIGHT * finalScale) / 2;
+        ctx.translate(offsetX, offsetY); ctx.scale(finalScale, finalScale);
+    } else {
+        ctx.translate(-cameraX, -cameraY);
+    }
+
+    let startXCell = gameOver ? 0 : Math.max(0, Math.floor((cameraX - CELL_SIZE) / CELL_SIZE));
+    let endXCell = gameOver ? COLS - 1 : Math.min(COLS - 1, Math.ceil((cameraX + canvas.width + CELL_SIZE) / CELL_SIZE));
+    let startYCell = gameOver ? 0 : Math.max(0, Math.floor((cameraY - CELL_SIZE) / CELL_SIZE));
+    let endYCell = gameOver ? ROWS - 1 : Math.min(ROWS - 1, Math.ceil((cameraY + canvas.height + CELL_SIZE) / CELL_SIZE));
+
+    for (let x = startXCell; x <= endXCell; x++) {
+        for (let y = startYCell; y <= endYCell; y++) {
+            ctx.fillStyle = trackMask[x][y] ? "#bdc3c7" : "#1b9247"; 
+            ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+            
+            if (bonusMap[`${x},${y}`]) {
+                let b = bonusMap[`${x},${y}`];
+                if(b.type === 'turbo') ctx.fillStyle = "#f1c40f";
+                else if(b.type === 'ghost') ctx.fillStyle = "#2980b9";
+                else if(b.type === 'nitro') ctx.fillStyle = "#27ae60";
+                else if(b.type === 'anchor') ctx.fillStyle = "#9b59b6";
+                else if(b.type === 'teleport') ctx.fillStyle = "#e67e22"; 
+                else if(b.type === 'life') ctx.fillStyle = "#ff6b81"; 
+                ctx.fillRect(x * CELL_SIZE + 2, y * CELL_SIZE + 2, CELL_SIZE - 4, CELL_SIZE - 4);
+            }
+        }
+    }
+
+    ctx.strokeStyle = gameOver ? "rgba(0, 0, 0, 0.02)" : "rgba(0, 0, 0, 0.06)";
+    ctx.lineWidth = 1;
+    for (let x = startXCell; x <= endXCell + 1; x++) {
+        ctx.beginPath(); ctx.moveTo(x * CELL_SIZE, startYCell * CELL_SIZE); ctx.lineTo(x * CELL_SIZE, (endYCell + 1) * CELL_SIZE); ctx.stroke();
+    }
+    for (let y = startYCell; y <= endYCell + 1; y++) {
+        ctx.beginPath(); ctx.moveTo(startXCell * CELL_SIZE, y * CELL_SIZE); ctx.lineTo((endXCell + 1) * CELL_SIZE, y * CELL_SIZE); ctx.stroke();
+    }
+
+    ctx.fillStyle = "rgba(241, 196, 15, 0.4)";
+    ctx.fillRect(startXCoord * CELL_SIZE, startYCoord * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+    
+    ctx.fillStyle = "rgba(26, 188, 156, 0.85)";
+    finishPoints.forEach(pt => { 
+        if (pt.x >= startXCell && pt.x <= endXCell && pt.y >= startYCell && pt.y <= endYCell) {
+            ctx.fillRect(pt.x * CELL_SIZE, pt.y * CELL_SIZE, CELL_SIZE, CELL_SIZE); 
+        }
+    });
+
+    players.forEach(p => {
+        if(!p.alive) return;
+        ctx.strokeStyle = p.color; ctx.lineWidth = gameOver ? 3 : 4;
+        ctx.beginPath();
+        p.history.forEach((pt, idx) => {
+            let cx = pt.x * CELL_SIZE + CELL_SIZE/2; let cy = pt.y * CELL_SIZE + CELL_SIZE/2;
+            if(idx === 0) ctx.moveTo(cx, cy); else ctx.lineTo(cx, cy);
+        });
+        ctx.stroke();
+
+        ctx.fillStyle = p.color; ctx.beginPath();
+        let dotRadius = gameOver ? CELL_SIZE/2 - 1 : CELL_SIZE/2 - 3;
+        ctx.arc(p.x * CELL_SIZE + CELL_SIZE/2, p.y * CELL_SIZE + CELL_SIZE/2, dotRadius, 0, Math.PI*2);
+        ctx.fill();
+        ctx.strokeStyle = p.hasTeleport ? "#e67e22" : (p.ghostWalls > 0 ? "#2980b9" : "#fff");
+        ctx.lineWidth = 2; ctx.stroke();
+    });
+
+    if (!gameOver) {
+        let p = players[currentPlayer];
+        let nextCenterX = p.x + p.vx;
+        let nextCenterY = p.y + p.vy;
+        let opponent = players[(currentPlayer + 1) % 2];
+
+        if (p.hasTeleport) {
+            for (let x = startXCell; x <= endXCell; x++) {
+                for (let y = startYCell; y <= endYCell; y++) {
+                    if (trackMask[x][y] && !(opponent.alive && opponent.x === x && opponent.y === y)) {
+                        ctx.fillStyle = "rgba(230, 126, 34, 0.25)"; 
+                        ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+                    }
+                }
+            }
+        } else if (p.forceAnchor) {
+            ctx.fillStyle = "rgba(155, 89, 182, 0.4)";
+            ctx.fillRect(p.x * CELL_SIZE, p.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+            ctx.strokeStyle = "#9b59b6"; ctx.lineWidth = 2;
+            ctx.strokeRect(p.x * CELL_SIZE, p.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+        } else {
+            let radius = p.turboTurns > 0 ? 2 : 1;
+
+            for(let dx = -radius; dx <= radius; dx++) {
+                for(let dy = -radius; dy <= radius; dy++) {
+                    let tx = nextCenterX + dx; let ty = nextCenterY + dy;
+                    let isOccupied = (opponent.alive && opponent.x === tx && opponent.y === ty);
+                    let pathRes = checkPathAndFinish(p.x, p.y, tx, ty, p.ghostWalls > 0);
+
+                    if (isOccupied || pathRes.status === "CRASH") {
+                        ctx.fillStyle = "rgba(231, 76, 60, 0.25)";
+                        ctx.fillRect(tx * CELL_SIZE, ty * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+                    } else {
+                        ctx.fillStyle = p.turboTurns > 0 ? "rgba(241, 196, 15, 0.35)" : "rgba(255, 255, 255, 0.35)";
+                        ctx.fillRect(tx * CELL_SIZE, ty * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+                        ctx.strokeStyle = p.color; ctx.lineWidth = 1.5;
+                        ctx.strokeRect(tx * CELL_SIZE, ty * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+                    }
+                }
+            }
+            ctx.fillStyle = "#fff"; ctx.beginPath();
+            ctx.arc(nextCenterX * CELL_SIZE + CELL_SIZE/2, nextCenterY * CELL_SIZE + CELL_SIZE/2, 5, 0, Math.PI*2);
+            ctx.fill();
+        }
+    }
+
+    ctx.restore();
+}
+
+function updateStatus() {
+    if(gameOver) return;
+    let p = players[currentPlayer];
+    let effects = [];
+    if(p.lives > 1) effects.push(`❤️ Жизней: ${p.lives}`);
+    if(p.forceAnchor) effects.push(`🟣 ЯКОРЬ!`);
+    if(p.hasTeleport) effects.push(`🟠 ТЕЛЕПОРТ!`);
+    if(p.turboTurns > 0) effects.push(`🟡 Турбо (${p.turboTurns}х)`);
+    if(p.ghostWalls > 0) effects.push(`🔵 Призрак (${p.ghostWalls}ст)`);
+    let effText = effects.length > 0 ? ` [${effects.join(' | ')}]` : '';
+    
+    statusPanel.textContent = `Ходит: ${p.name}${effText}`;
+    statusPanel.className = currentPlayer === 0 ? "p1-turn" : "p2-turn";
+}
+
+function endGame(message) {
+    gameOver = true;
+    statusPanel.textContent = "КОНЕЦ МАТЧА";
+    statusPanel.className = "game-over-status";
+    draw();
+    setTimeout(() => { alert(message); }, 100);
+}
+
+function processMove(targetX, targetY) {
+    let p = players[currentPlayer];
+    let opponent = players[(currentPlayer + 1) % 2];
+
+    if (p.forceAnchor) {
+        if (targetX === p.x && targetY === p.y) {
+            p.vx = 0; p.vy = 0;
+            p.forceAnchor = false; 
+            p.history.push({x: p.x, y: p.y});
+            currentPlayer = (currentPlayer + 1) % 2;
+            updateCamera(); updateStatus(); draw();
+        }
+        return;
+    }
+
+    if (p.hasTeleport) {
+        if (targetX >= 0 && targetX < COLS && targetY >= 0 && targetY < ROWS && trackMask[targetX][targetY]) {
+            if (opponent.alive && opponent.x === targetX && opponent.y === targetY) return;
+
+            p.x = targetX; p.y = targetY;
+            p.vx = 0; p.vy = 0;
+            p.hasTeleport = false; 
+            p.history.push({x: p.x, y: p.y});
+
+            if (isCellFinish(p.x, p.y)) {
+                endGame(`🏆 ТЕЛЕПОРТАЦИЯ КУДА НАДО! ${p.name} переместился на финиш и победил!`);
+                return;
+            }
+
+            currentPlayer = (currentPlayer + 1) % 2;
+            updateCamera(); updateStatus(); draw();
+        }
+        return;
+    }
+
+    let nextCenterX = p.x + p.vx;
+    let nextCenterY = p.y + p.vy;
+    let dx = targetX - nextCenterX;
+    let dy = targetY - nextCenterY;
+    let radius = p.turboTurns > 0 ? 2 : 1;
+
+    if (Math.abs(dx) <= radius && Math.abs(dy) <= radius) {
+        let isOccupied = (opponent.alive && opponent.x === targetX && opponent.y === targetY);
+        let pathRes = checkPathAndFinish(p.x, p.y, targetX, targetY, p.ghostWalls > 0);
+
+        if (isOccupied || pathRes.status === "CRASH") {
+            if (p.lives > 1) {
+                p.lives--; p.vx = 0; p.vy = 0; 
+                alert(`💥 УДАР СМЯГЧЕН! Потрачена доп. жизнь. Скорость сброшена в 0.`);
+                p.history.push({x: p.x, y: p.y});
+                currentPlayer = (currentPlayer + 1) % 2;
+                updateCamera(); updateStatus(); draw();
+            } else {
+                endGame(`💥 ТОТАЛЬНАЯ АВАРИЯ! ${p.name} разбился о стену лабиринта!\n\n🏆 Победил ${opponent.name}!`);
+            }
+            return;
+        }
+
+        if (pathRes.status === "FINISH") {
+            p.x = pathRes.x; p.y = pathRes.y;
+            p.history.push({x: p.x, y: p.y});
+            endGame(`🏆 ПОБЕДА! ${p.name} безупречно доехал до тупика финиша!`);
+            return;
+        }
+
+        if (targetX >= 0 && targetX < COLS && targetY >= 0 && targetY < ROWS) {
+            if (!trackMask[targetX][targetY] && p.ghostWalls > 0) {
+                p.ghostWalls--;
+            }
+        }
+
+        p.vx = targetX - p.x; p.vy = targetY - p.y;
+        p.x = targetX; y = targetY; // Исправление локальной переменной целевой точки
+        p.y = targetY;
+
+        let bonusKey = `${p.x},${p.y}`;
+        if (bonusMap[bonusKey]) {
+            let bonus = bonusMap[bonusKey];
+            delete bonusMap[bonusKey]; 
+            
+            if (bonus.type === 'life') { 
+                p.lives++; 
+                alert(`❤️ ДОПОЛНИТЕЛЬНАЯ ЖИЗНЬ! У ${p.name} теперь жизней: ${p.lives}. При аварии скорость сбросится без проигрыша.`);
+            } 
+            else if (bonus.type === 'anchor') { 
+                opponent.forceAnchor = true; 
+                alert(`🟣 ЯКОРЬ-ЛОВУШКА! Следующий ход игрока ${opponent.name} заблокирован. Ему придется пропустить ход на месте.`); 
+            } 
+            else if (bonus.type === 'teleport') { 
+                p.hasTeleport = true; 
+                alert(`🟠 ТЕЛЕПОРТ АКТИВИРОВАН! Кликни на любую серую клетку дороги на карте, чтобы мгновенно прыгнуть туда.`); 
+            } 
+            else if (bonus.type === 'turbo') { 
+                p.turboTurns = 5; 
+                alert(`🟡 РЕЖИМ ТУРБО! Сетка маневрирования расширена до 5х5 на следующие 4 хода.`);
+            } 
+            else if (bonus.type === 'ghost') { 
+                p.ghostWalls = 4; 
+                alert(`🔵 РЕЖИМ ПРИЗРАКА! Получено 4 заряда для прохождения сквозь зеленые стены. Заряд снимется только при остановке внутри стены.`);
+            } 
+            else if (bonus.type === 'nitro') { 
+                p.x += p.vx * 0.5 > 0 ? 2 : 1; p.vx += 2; 
+                alert(`🟢 МГНОВЕННОЕ НИТРО! Машинка получила мощный толчок скорости на +2 клетки вперед.`);
+            }
+        }
+
+        p.history.push({x: p.x, y: p.y});
+        if(p.turboTurns > 0) p.turboTurns--;
+
+        currentPlayer = (currentPlayer + 1) % 2;
+        updateCamera();
+        
+        if (getValidMovesCount(currentPlayer) === 0) {
+            let loser = players[currentPlayer];
+            if (loser.lives > 1) {
+                loser.lives--; loser.vx = 0; loser.vy = 0;
+                alert(`💥 ВЫ ЗАЕХАЛИ В ТУПИК! Потрачена доп. жизнь. Инерция обнулена, можно развернуться.`);
+            } else {
+                endGame(`💥 ЗАБЛОКИРОВАН! У ${loser.name} нет доступных траекторий для хода!\n\n🏆 Победил ${opponent.name}!`);
+                return;
+            }
+        }
+
+        updateStatus();
+        draw();
+    }
+}
+
+canvas.addEventListener('click', function(e) {
+    if (gameOver) return;
+    const rect = canvas.getBoundingClientRect();
+    const clickedX = Math.floor((e.clientX - rect.left + cameraX) / CELL_SIZE);
+    const clickedY = Math.floor((e.clientY - rect.top + cameraY) / CELL_SIZE);
+    processMove(clickedX, clickedY);
+});
+
+window.addEventListener('keydown', function(e) {
+    if (gameOver) return;
+    let p = players[currentPlayer];
+    if (p.hasTeleport) return;
+    
+    let key = e.key.toLowerCase();
+    if (p.forceAnchor) {
+        if ((currentPlayer === 0 && key === 's') || (currentPlayer === 1 && (key === '5' || e.code === 'Numpad5'))) {
+            processMove(p.x, p.y);
+        }
+        return;
+    }
+
+    let moveModifier = null;
+    if (currentPlayer === 0) { if (P1_KEYS[key]) moveModifier = P1_KEYS[key]; } 
+    else {
+        if (P2_KEYS[key]) moveModifier = P2_KEYS[key];
+        else if (P2_KEYS[e.code]) moveModifier = P2_KEYS[e.code];
+    }
+
+    if (moveModifier !== null) {
+        e.preventDefault();
+        let multiplier = p.turboTurns > 0 ? 2 : 1;
+        let targetX = p.x + p.vx + (moveModifier.dx * multiplier);
+        let targetY = p.y + p.vy + (moveModifier.dy * multiplier);
+        processMove(targetX, targetY);
+    }
+});
+
+function resetGame() { generateMazeTrack(); }
+// Первая инициализация с отображением правил в зависимости от дефолтного чекбокса
+toggleBonusLegend();
+generateMazeTrack();
+</script>
+
+</body>
+</html>
